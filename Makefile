@@ -1,14 +1,13 @@
 install:
 	npm ci
 
-build:
-	npm run build
-
 lint:
-	npx eslint .
+	npm run lint
+	npm --silent run format:check
 
-publish:
-	npm publish
+lint-fix:
+	npm run format
+	npm run lint -- --fix
 
 test:
 	npm test

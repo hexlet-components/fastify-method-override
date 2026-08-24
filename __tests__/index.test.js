@@ -1,13 +1,12 @@
-/* eslint-disable no-console */
-/* eslint no-param-reassign: ["error", { "props": false }] */
+import fastify from "fastify";
+import { NotFound } from "http-errors";
 
-import fastify from 'fastify';
-import { NotFound } from 'http-errors';
+import { afterAll, beforeAll, describe, expect, it, test } from "vitest";
 
-import fastifyMethodOverride from '../src';
+import fastifyMethodOverride from "../src/index.js";
 
-describe('fastifyMethodOverride', () => {
-  const methods = ['GET', 'POST', 'HEAD', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'];
+describe("fastifyMethodOverride", () => {
+  const methods = ["GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS", "PATCH"];
   let app;
 
   beforeAll(async () => {
@@ -17,11 +16,13 @@ describe('fastifyMethodOverride', () => {
     methods.forEach((method) => {
       app.route({
         method,
-        url: '/',
+        url: "/",
         preHandler: [
-          async (req, reply) => { reply.status = 'check'; },
+          async (req, reply) => {
+            reply.status = "check";
+          },
           (req, reply, done) => {
-            reply.status = 'check';
+            reply.status = "check";
             done();
           },
         ],
@@ -32,7 +33,7 @@ describe('fastifyMethodOverride', () => {
 
       app.route({
         method,
-        url: '/url/:id',
+        url: "/url/:id",
         handler: (req, reply) => {
           const { params } = req;
           reply.send({ method, params });
@@ -41,7 +42,7 @@ describe('fastifyMethodOverride', () => {
 
       app.route({
         method,
-        url: '/site/:name/assets/*',
+        url: "/site/:name/assets/*",
         handler: (req, reply) => {
           const { params } = req;
           reply.send({ method, params });
@@ -50,70 +51,74 @@ describe('fastifyMethodOverride', () => {
     });
 
     app.route({
-      method: 'PATCH',
-      url: '/withprehandlers',
+      method: "PATCH",
+      url: "/withprehandlers",
       preHandler: [
-        (req, reply, done) => { done(); },
+        (req, reply, done) => {
+          done();
+        },
         async (req, reply) => {
           reply.code(401);
-          reply.send({ url: '/withprehandlers' });
+          reply.send({ url: "/withprehandlers" });
         },
       ],
       handler: (req, reply) => {
-        reply.send({ method: 'PATCH' });
+        reply.send({ method: "PATCH" });
       },
     });
 
     app.route({
-      method: 'PATCH',
-      url: '/witherror',
+      method: "PATCH",
+      url: "/witherror",
       preHandler: (req, reply, done) => {
         reply.code(500);
-        done('Some Error');
+        done("Some Error");
       },
       handler: (req, reply) => {
-        reply.send({ method: 'PATCH' });
+        reply.send({ method: "PATCH" });
       },
     });
 
     app.route({
-      method: 'PATCH',
-      url: '/withthrow',
+      method: "PATCH",
+      url: "/withthrow",
       preHandler: [
-        (req, reply, done) => { done(); },
+        (req, reply, done) => {
+          done();
+        },
         async () => {
-          throw new NotFound('Some Error');
+          throw new NotFound("Some Error");
         },
       ],
       handler: (req, reply) => {
-        reply.send({ method: 'PATCH' });
+        reply.send({ method: "PATCH" });
       },
     });
 
     app.route({
-      method: 'PUT',
-      url: '/withconfig',
+      method: "PUT",
+      url: "/withconfig",
       config: {
-        a: 'a',
-        b: 'b',
+        a: "a",
+        b: "b",
       },
       handler: (req, reply) => {
-        reply.send({ method: 'PUT', config: reply.context.config });
+        reply.send({ method: "PUT", config: reply.context.config });
       },
     });
   });
 
-  describe('#should be override', () => {
+  describe("#should be override", () => {
     test.each([
-      ['POST', 'HEAD'],
-      ['POST', 'PUT'],
-      ['POST', 'DELETE'],
-      ['POST', 'OPTIONS'],
-      ['POST', 'PATCH'],
-    ])('#test from %s to %s', async (methodFrom, methodTo) => {
+      ["POST", "HEAD"],
+      ["POST", "PUT"],
+      ["POST", "DELETE"],
+      ["POST", "OPTIONS"],
+      ["POST", "PATCH"],
+    ])("#test from %s to %s", async (methodFrom, methodTo) => {
       const res = await app.inject({
         method: methodFrom,
-        url: '/',
+        url: "/",
         payload: { _method: methodTo },
       });
 
@@ -124,10 +129,10 @@ describe('fastifyMethodOverride', () => {
       expect(actual).toEqual(expected);
     });
 
-    test('#throw error if route not find', async () => {
-      const methodFrom = 'POST';
-      const methodTo = 'PATCH';
-      const url = '/url';
+    test("#throw error if route not find", async () => {
+      const methodFrom = "POST";
+      const methodTo = "PATCH";
+      const url = "/url";
 
       const res = await app.inject({
         method: methodFrom,
@@ -143,20 +148,20 @@ describe('fastifyMethodOverride', () => {
     });
   });
 
-  describe('#should not be override', () => {
+  describe("#should not be override", () => {
     test.each([
-      ['PATCH', 'HEAD'],
-      ['HEAD', 'PUT'],
-      ['PUT', 'DELETE'],
-      ['DELETE', 'OPTIONS'],
-      ['OPTIONS', 'PATCH'],
-      ['GET', 'PATCH'],
-      ['GET', 'POST'],
-      ['POST', 'ERRORMETHOD'],
-    ])('#test from %s to %s', async (methodFrom, methodTo) => {
+      ["PATCH", "HEAD"],
+      ["HEAD", "PUT"],
+      ["PUT", "DELETE"],
+      ["DELETE", "OPTIONS"],
+      ["OPTIONS", "PATCH"],
+      ["GET", "PATCH"],
+      ["GET", "POST"],
+      ["POST", "ERRORMETHOD"],
+    ])("#test from %s to %s", async (methodFrom, methodTo) => {
       const res = await app.inject({
         method: methodFrom,
-        url: '/',
+        url: "/",
         payload: { _method: methodTo },
       });
 
@@ -168,42 +173,42 @@ describe('fastifyMethodOverride', () => {
     });
   });
 
-  describe('should work', () => {
+  describe("should work", () => {
     const cases = [
-      ['POST', 'HEAD'],
-      ['POST', 'PUT'],
-      ['POST', 'DELETE'],
-      ['POST', 'OPTIONS'],
-      ['POST', 'PATCH'],
-      ['GET', 'GET'],
-      ['PUT', 'PUT'],
-      ['HEAD', 'HEAD'],
-      ['PATCH', 'PATCH'],
-      ['OPTIONS', 'OPTIONS'],
-      ['DELETE', 'DELETE'],
+      ["POST", "HEAD"],
+      ["POST", "PUT"],
+      ["POST", "DELETE"],
+      ["POST", "OPTIONS"],
+      ["POST", "PATCH"],
+      ["GET", "GET"],
+      ["PUT", "PUT"],
+      ["HEAD", "HEAD"],
+      ["PATCH", "PATCH"],
+      ["OPTIONS", "OPTIONS"],
+      ["DELETE", "DELETE"],
     ];
 
-    describe('with named params', () => {
-      test.each(cases)('#test from %s to %s', async (methodFrom, methodTo) => {
+    describe("with named params", () => {
+      test.each(cases)("#test from %s to %s", async (methodFrom, methodTo) => {
         const res = await app.inject({
           method: methodFrom,
-          url: '/url/id',
+          url: "/url/id",
           payload: { _method: methodTo },
         });
 
         const actual = JSON.parse(res.body);
-        const expected = { method: methodTo, params: { id: 'id' } };
+        const expected = { method: methodTo, params: { id: "id" } };
 
         expect(res.statusCode).toBe(200);
         expect(actual).toEqual(expected);
       });
     });
 
-    describe('with named & unnamed params', () => {
-      test.each(cases)('#test from %s to %s', async (methodFrom, methodTo) => {
+    describe("with named & unnamed params", () => {
+      test.each(cases)("#test from %s to %s", async (methodFrom, methodTo) => {
         const res = await app.inject({
           method: methodFrom,
-          url: '/site/testname/assets/some/asset/file',
+          url: "/site/testname/assets/some/asset/file",
           payload: { _method: methodTo },
         });
 
@@ -211,8 +216,8 @@ describe('fastifyMethodOverride', () => {
         const expected = {
           method: methodTo,
           params: {
-            '*': 'some/asset/file',
-            name: 'testname',
+            "*": "some/asset/file",
+            name: "testname",
           },
         };
 
@@ -222,102 +227,103 @@ describe('fastifyMethodOverride', () => {
     });
   });
 
-  describe('test setNotFoundHandler', () => {
-    it('GET 200', async () => {
+  describe("test setNotFoundHandler", () => {
+    it("GET 200", async () => {
       const res = await app.inject({
-        method: 'GET',
-        url: '/',
+        method: "GET",
+        url: "/",
       });
 
       expect(res.statusCode).toBe(200);
     });
 
-    it('GET 200 override', async () => {
+    it("GET 200 override", async () => {
       const res = await app.inject({
-        method: 'POST',
-        url: '/',
-        payload: { _method: 'DELETE' },
+        method: "POST",
+        url: "/",
+        payload: { _method: "DELETE" },
       });
 
       expect(res.statusCode).toBe(200);
     });
 
-    it('POST 200 not override', async () => {
+    it("POST 200 not override", async () => {
       const res = await app.inject({
-        method: 'POST',
-        url: '/',
-        payload: { _method: 'ERRORMETHOD' },
+        method: "POST",
+        url: "/",
+        payload: { _method: "ERRORMETHOD" },
       });
 
       expect(res.statusCode).toBe(200);
     });
 
-    it('GET 404', async () => {
+    it("GET 404", async () => {
       const res = await app.inject({
-        method: 'GET',
-        url: '/wrong-path',
+        method: "GET",
+        url: "/wrong-path",
       });
 
       expect(res.statusCode).toBe(404);
     });
 
-    it('POST 404 override', async () => {
+    it("POST 404 override", async () => {
       const res = await app.inject({
-        method: 'POST',
-        url: '/wrong-path',
-        payload: { _method: 'DELETE' },
+        method: "POST",
+        url: "/wrong-path",
+        payload: { _method: "DELETE" },
       });
 
       expect(res.statusCode).toBe(404);
     });
   });
 
-  describe('test preHandlers', () => {
-    it('PATCH 401', async () => {
+  describe("test preHandlers", () => {
+    it("PATCH 401", async () => {
       const res = await app.inject({
-        method: 'POST',
-        url: '/withprehandlers',
-        payload: { _method: 'PATCH' },
+        method: "POST",
+        url: "/withprehandlers",
+        payload: { _method: "PATCH" },
       });
 
       const actual = JSON.parse(res.body);
-      const expected = { url: '/withprehandlers' };
+      const expected = { url: "/withprehandlers" };
 
       expect(res.statusCode).toBe(401);
       expect(actual).toEqual(expected);
     });
 
-    it('PATCH 500 preHandler', async () => {
+    it("PATCH 500 preHandler", async () => {
       const res = await app.inject({
-        method: 'POST',
-        url: '/witherror',
-        payload: { _method: 'PATCH' },
+        method: "POST",
+        url: "/witherror",
+        payload: { _method: "PATCH" },
       });
 
       expect(res.statusCode).toBe(500);
     });
 
-    it('PATCH 404 preHandler throw', async () => {
+    it("PATCH 404 preHandler throw", async () => {
       const res = await app.inject({
-        method: 'POST',
-        url: '/withthrow',
-        payload: { _method: 'PATCH' },
+        method: "POST",
+        url: "/withthrow",
+        payload: { _method: "PATCH" },
       });
 
       expect(res.statusCode).toBe(404);
     });
 
-    it('PUT should have route config', async () => {
+    it("PUT should have route config", async () => {
       const res = await app.inject({
-        method: 'POST',
-        url: '/withconfig',
-        payload: { _method: 'PUT' },
+        method: "POST",
+        url: "/withconfig",
+        payload: { _method: "PUT" },
       });
       const actual = JSON.parse(res.body);
       expect(actual).toMatchObject({
-        method: 'PUT',
+        method: "PUT",
         config: {
-          a: 'a', b: 'b',
+          a: "a",
+          b: "b",
         },
       });
     });

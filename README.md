@@ -1,23 +1,34 @@
-# fastify-method-override
+# @hexlet/fastify-method-override
 
-[![github action status](https://github.com/corsicanec82/fastify-method-override/workflows/Node%20CI/badge.svg)](https://github.com/corsicanec82/fastify-method-override/actions)
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/c0c97dff8bda4e288123f08b3bd45fe7)](https://www.codacy.com/manual/corsicanec82/fastify-method-override?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=corsicanec82/fastify-method-override&amp;utm_campaign=Badge_Grade)
-[![test coverage](https://codecov.io/gh/corsicanec82/fastify-method-override/branch/master/graph/badge.svg)](https://codecov.io/gh/corsicanec82/fastify-method-override)
-[![npm version](https://badge.fury.io/js/fastify-method-override.svg)](https://badge.fury.io/js/fastify-method-override)
+Форк [corsicanec82/fastify-method-override](https://github.com/corsicanec82/fastify-method-override),
+который не обновлялся с 2023 года и не работает с Fastify 5: плагин объявлен как
+`async (fastify, opts, next)` и при этом зовёт `next()`, а Fastify 5 такое
+отвергает — «plugin being registered mixes async and callback styles».
+
+Что изменено относительно апстрима:
+
+- плагин объявлен только с `async`, без `next`;
+- заявленная совместимость это `fastify: 5.x`;
+- пакет отдаётся как ESM без сборки, `babel` убран;
+- тесты переведены с `jest` на `vitest`, линтер с `eslint` на `oxlint` и `oxfmt`.
+
+Поведение и публичный интерфейс не менялись: те же 45 тестов апстрима зелёные.
+
+[![github action status](https://github.com/hexlet-components/fastify-method-override/actions/workflows/nodeci.yml/badge.svg)](https://github.com/hexlet-components/fastify-method-override/actions)
 
 Plugin for [Fastify](http://fastify.io/), which allows use HTTP verbs, such as DELETE, PATCH, HEAD, PUT, OPTIONS in case the client doesn't support them. Supports Fastify versions `>=2.0.0`.
 
 ## Install
 
 ```sh
-$ npm install fastify-method-override
+$ npm install @hexlet/fastify-method-override
 ```
 
 ## Usage
 
 ``` javascript
 import fastify from 'fastify';
-import fastifyMethodOverride from 'fastify-method-override';
+import fastifyMethodOverride from '@hexlet/fastify-method-override';
 
 const app = fastify();
 

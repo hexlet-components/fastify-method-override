@@ -5,36 +5,14 @@ on:
   - pull_request
 
 jobs:
-  test:
-    strategy:
-      matrix:
-        node-version: [16, 18, 19]
-
-    name: Use node ${{ matrix.node-version }}
+  check:
+    name: Lint and test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 26
       - run: make install
+      - run: make lint
       - run: make test
-
-  build:
-    needs: [test]
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
-      - name: Install dependencies
-        run: make install
-      - name: Run linter
-        run: make lint
-      - name: Run test-coverage
-        run: make test-coverage
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TEST_REPORTER_ID }}
