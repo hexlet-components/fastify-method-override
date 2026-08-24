@@ -1,5 +1,4 @@
 import fastify from "fastify";
-import { NotFound } from "http-errors";
 
 import { afterAll, beforeAll, describe, expect, it, test } from "vitest";
 
@@ -87,7 +86,7 @@ describe("fastifyMethodOverride", () => {
           done();
         },
         async () => {
-          throw new NotFound("Some Error");
+          throw Object.assign(new Error("Some Error"), { statusCode: 404 });
         },
       ],
       handler: (req, reply) => {

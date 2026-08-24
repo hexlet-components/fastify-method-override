@@ -1,115 +1,164 @@
-import fp from "fastify-plugin";
-import _ from "lodash";
-// http-errors это CJS-пакет, который собирает свои экспорты в рантайме, поэтому
-// нода не видит `NotFound` статически и именованный импорт падает «does not
-// provide an export named NotFound». Под babel и под трансформом vitest он
-// работал, поэтому отказ вылезал только в приложении. У path-to-regexp экспорты
-// объявлены обычным `exports.match =`, их нода разбирает, и там форма обычная.
-import createError from "http-errors";
-import { match } from "path-to-regexp";
-import path from "path";
+// Плагин без зависимостей. Апстрим тянул lodash, http-errors и path-to-regexp,
+// все три пакета CJS, и на ESM без сборки именованный импорт из них ломался в
+// рантайме. Каждый из трёх заменён обычным JS.
 
-const { NotFound } = createError;
+const SKIP_OVERRIDE = Symbol.for("skip-override");
 
-const getMethod = _.flow(_.get, _.toLower);
+const overridableMethods = new Set(["HEAD", "PUT", "DELETE", "OPTIONS", "PATCH"]);
 
-const getHooks = (routeOptions, hookName) => {
-  const hook = _.get(routeOptions, hookName, []);
-  return _.isArray(hook) ? hook : [hook];
+const notFound = (message) => Object.assign(new Error(message), { statusCode: 404 });
+
+const toArray = (value) => {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  return Array.isArray(value) ? value : [value];
 };
 
-const hooksTable = ["preValidation", "preHandler"];
+const escapeSegment = (segment) => segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const getAllHooks = (routeOptions) =>
-  _.flatMap(hooksTable, (hookName) => getHooks(routeOptions, hookName));
+// Матчер по шаблону маршрута fastify: `:name` это один сегмент пути, `*` это
+// весь остаток. Совпавшие значения отдаются в том же виде, в каком их отдал бы
+// сам fastify, потому что обработчик читает их из `request.params`.
+const buildMatcher = (url) => {
+  const names = [];
+  let hasWildcard = false;
+
+  const source = url
+    .split("/")
+    .map((segment) => {
+      if (segment.startsWith(":")) {
+        names.push(segment.slice(1));
+        return "([^/]+)";
+      }
+      if (segment === "*") {
+        hasWildcard = true;
+        return "(.*)";
+      }
+      return escapeSegment(segment);
+    })
+    .join("/");
+
+  const pattern = new RegExp(`^${source}/?$`);
+
+  return (pathname) => {
+    const found = pattern.exec(pathname);
+    if (found === null) {
+      return null;
+    }
+
+    const params = Object.fromEntries(
+      names.map((name, index) => [name, decodeURIComponent(found[index + 1])]),
+    );
+
+    if (hasWildcard) {
+      params["*"] = decodeURIComponent(found[names.length + 1]);
+    }
+
+    return params;
+  };
+};
+
+// Хук маршрута бывает и async, и колбэчным, поэтому поддерживаются оба вида:
+// колбэк получает `done`, а промис дожидается сам.
+const runHook = (hook, request, reply) =>
+  new Promise((resolve, reject) => {
+    const result = hook(request, reply, (error) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+
+    if (typeof result?.then === "function") {
+      result.then(() => resolve(), reject);
+    }
+  });
 
 const fastifyMethodOverride = async (fastify) => {
-  const allowMethods = new Set(["head", "put", "delete", "options", "patch"]);
-  const routeMatchers = {};
+  const routesByMethod = new Map();
 
-  const handleRedirect = async (req, reply) => {
-    const url = _.get(req, "raw.url");
-    const originalMethod = getMethod(req, "raw.method");
-    const method = getMethod(req, "body._method");
-
-    if (originalMethod === "post" && allowMethods.has(method)) {
-      const route = _.get(routeMatchers, method).find(({ check }) => check(url)) || {};
-      const { handler, check, hooks } = route;
-      const config = _.get(route, "config", {});
-      const replyConfig = _.get(reply, "context.config", {});
-
-      _.set(reply, "context.config", { ...config, ...replyConfig, method: _.toUpper(method) });
-
-      if (!handler) {
-        const message = `Route ${_.toUpper(method)}:${url} not found`;
-        throw new NotFound(message);
-      }
-
-      const { params } = check(url);
-      const baseParams = _.has(params, "unnamedParams")
-        ? { "*": params.unnamedParams.join(path.sep) }
-        : {};
-      _.set(req, "params", { ...baseParams, ..._.omit(params, "unnamedParams") });
-      _.set(req, "raw.method", _.toUpper(method));
-
-      for (const hook of hooks) {
-        await new Promise((resolve, reject) => {
-          const maybePromise = hook(req, reply, (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-          if (_.get(maybePromise, "constructor.name") === "Promise") {
-            maybePromise
-              .then(() => {
-                resolve();
-              })
-              .catch((err) => {
-                reject(err);
-              });
-          }
-        });
-        if (reply.sent) {
-          return;
-        }
-      }
-
-      await handler(req, reply);
+  const override = async (request, reply) => {
+    if (request.raw.method.toUpperCase() !== "POST") {
+      return;
     }
+
+    const method = String(request.body?._method ?? "").toUpperCase();
+    if (!overridableMethods.has(method)) {
+      return;
+    }
+
+    const url = request.raw.url;
+    const routes = routesByMethod.get(method) ?? [];
+    const found = routes
+      .map((route) => ({ route, params: route.match(url) }))
+      .find(({ params }) => params !== null);
+
+    // Конфиг маршрута апстрим кладёт в `reply.context.config`, и обработчики
+    // читают его оттуда. В fastify 5 такого свойства нет вовсе, то есть объект
+    // создаёт сам плагин. Поведение сохранено: на нём держатся потребители.
+    reply.context = {
+      ...reply.context,
+      config: { ...found?.route.config, ...reply.context?.config, method },
+    };
+
+    if (found === undefined) {
+      throw notFound(`Route ${method}:${url} not found`);
+    }
+
+    request.params = found.params;
+    request.raw.method = method;
+
+    // Хуки подменённого маршрута зовутся руками: fastify отработал хуки
+    // POST-маршрута, а у подменённого свои. Без них правка и удаление прошли бы
+    // мимо авторизации, объявленной у PATCH и DELETE.
+    for (const hook of found.route.hooks) {
+      await runHook(hook, request, reply);
+      if (reply.sent) {
+        return;
+      }
+    }
+
+    await found.route.handler(request, reply);
   };
 
   fastify.addHook("onRoute", (routeOptions) => {
-    const { url, handler, config } = routeOptions;
-    const method = getMethod(routeOptions, "method");
+    const methods = toArray(routeOptions.method).map((method) => method.toUpperCase());
 
-    if (allowMethods.has(method)) {
-      const hooks = getAllHooks(routeOptions);
-      _.update(routeMatchers, _.toLower(method), (methodHandlers = []) =>
-        methodHandlers.concat({
-          check: match(url.replace(/\*.*/, ":unnamedParams*")),
-          handler,
-          hooks,
-          config,
-        }),
-      );
+    const overridable = methods.find((method) => overridableMethods.has(method));
+    if (overridable !== undefined) {
+      const routes = routesByMethod.get(overridable) ?? [];
+      routes.push({
+        match: buildMatcher(routeOptions.url),
+        handler: routeOptions.handler,
+        config: routeOptions.config,
+        hooks: [...toArray(routeOptions.preValidation), ...toArray(routeOptions.preHandler)],
+      });
+      routesByMethod.set(overridable, routes);
     }
 
-    if (_.toLower(routeOptions.method) === "post") {
-      const preHandlers = getHooks(routeOptions, "preHandler");
-      _.set(routeOptions, "preHandler", [handleRedirect, ...preHandlers]);
+    if (methods.includes("POST")) {
+      routeOptions.preHandler = [override, ...toArray(routeOptions.preHandler)];
     }
   });
 
-  fastify.setNotFoundHandler({
-    preHandler: async (req, reply) => {
-      await handleRedirect(req, reply);
-    },
+  // Формы отправляют POST на адреса вида `/users/:id`, где POST-маршрута нет
+  // вовсе, поэтому одного `preHandler` мало: до него дело не доходит, запрос
+  // уходит в «не найдено».
+  fastify.setNotFoundHandler({ preHandler: override }, (request, reply) => {
+    reply.code(404).send({
+      statusCode: 404,
+      error: "Not Found",
+      message: `Route ${request.raw.method}:${request.raw.url} not found`,
+    });
   });
 };
 
-export default fp(fastifyMethodOverride, {
-  fastify: "5.x",
-  name: "fastify-method-override",
-});
+// Метка `skip-override` говорит fastify не создавать для плагина отдельный
+// контекст: `addHook('onRoute')` и `setNotFoundHandler` должны действовать на
+// то приложение, куда плагин зарегистрирован. Раньше её ставил fastify-plugin,
+// но это тоже CJS-пакет, а метка ставится одной строкой.
+fastifyMethodOverride[SKIP_OVERRIDE] = true;
+
+export default fastifyMethodOverride;
