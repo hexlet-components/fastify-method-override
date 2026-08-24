@@ -1,8 +1,15 @@
 import fp from "fastify-plugin";
 import _ from "lodash";
-import { NotFound } from "http-errors";
+// http-errors это CJS-пакет, который собирает свои экспорты в рантайме, поэтому
+// нода не видит `NotFound` статически и именованный импорт падает «does not
+// provide an export named NotFound». Под babel и под трансформом vitest он
+// работал, поэтому отказ вылезал только в приложении. У path-to-regexp экспорты
+// объявлены обычным `exports.match =`, их нода разбирает, и там форма обычная.
+import createError from "http-errors";
 import { match } from "path-to-regexp";
 import path from "path";
+
+const { NotFound } = createError;
 
 const getMethod = _.flow(_.get, _.toLower);
 
