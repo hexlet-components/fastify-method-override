@@ -22,6 +22,22 @@
 
 Поведение и публичный интерфейс не менялись: те же 45 тестов апстрима зелёные.
 
+## Установка
+
+Пакет в npm не публикуется, зависимость берётся прямо с GitHub:
+
+```json
+{
+  "dependencies": {
+    "@hexlet/fastify-method-override": "git+https://github.com/hexlet-components/fastify-method-override.git"
+  }
+}
+```
+
+Сборочного шага нет, поэтому такая установка работает без `prepare`: npm тянет
+репозиторий и берёт `src/index.js` как есть. Конкретный коммит фиксирует
+`package-lock.json` у потребителя.
+
 [![github action status](https://github.com/hexlet-components/fastify-method-override/actions/workflows/nodeci.yml/badge.svg)](https://github.com/hexlet-components/fastify-method-override/actions)
 
 Plugin for [Fastify](http://fastify.io/), which allows use HTTP verbs, such as DELETE, PATCH, HEAD, PUT, OPTIONS in case the client doesn't support them. Supports Fastify versions `>=2.0.0`.
