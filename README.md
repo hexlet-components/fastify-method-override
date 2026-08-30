@@ -45,7 +45,7 @@ Plugin for [Fastify](http://fastify.io/), which allows use HTTP verbs, such as D
 ## Install
 
 ```sh
-$ npm install @hexlet/fastify-method-override
+npm install @hexlet/fastify-method-override
 ```
 
 ## Usage
