@@ -34,18 +34,18 @@
 }
 ```
 
-Сборочного шага нет, поэтому такая установка работает без `prepare`: npm тянет
-репозиторий и берёт `src/index.js` как есть. Конкретный коммит фиксирует
-`package-lock.json` у потребителя.
+Сборочного шага нет, поэтому такая установка работает без `prepare`: пакетный
+менеджер тянет репозиторий и берёт `src/index.js` как есть. Конкретный коммит
+фиксирует lock-файл потребителя.
 
 [![github action status](https://github.com/hexlet-components/fastify-method-override/actions/workflows/nodeci.yml/badge.svg)](https://github.com/hexlet-components/fastify-method-override/actions)
 
-Plugin for [Fastify](http://fastify.io/), which allows use HTTP verbs, such as DELETE, PATCH, HEAD, PUT, OPTIONS in case the client doesn't support them. Supports Fastify versions `>=2.0.0`.
+Plugin for [Fastify](http://fastify.io/), which allows use HTTP verbs, such as DELETE, PATCH, HEAD, PUT, OPTIONS in case the client doesn't support them. Supports Fastify `5.x`.
 
 ## Install
 
 ```sh
-npm install @hexlet/fastify-method-override
+pnpm add git+https://github.com/hexlet-components/fastify-method-override.git
 ```
 
 ## Usage

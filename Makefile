@@ -1,16 +1,16 @@
 install:
-	npm ci
+	pnpm install --frozen-lockfile
 
 lint:
-	npm run lint
-	npm --silent run format:check
+	pnpm --silent run lint
+	pnpm --silent run format:check
 
 lint-fix:
-	npm run format
-	npm run lint -- --fix
+	pnpm run format
+	pnpm run lint --fix
 
 test:
-	npm test
+	pnpm test
 
 test-coverage:
-	npm test -- --coverage
+	pnpm exec vitest run --coverage
